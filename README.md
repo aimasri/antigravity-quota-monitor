@@ -6,12 +6,14 @@ Designed for developers migrating from the Antigravity IDE to the standalone CLI
 
 ## Features
 
-- **Concentric Ring Visualization:**
-  - **Outer Ring:** Shows remaining quota percentage for **Gemini Flash**.
-  - **Inner Ring:** Shows remaining quota percentage for **Gemini Pro**.
-  - **Center Dot:** Shows remaining quota status for **Claude / GPT**.
-- **Interactive Menu:** Click the icon to view detailed model breakdowns and exact reset countdowns (e.g., "Resets in 3h 54m").
-- **Hover Tooltip:** Quick readout of percentages when hovering.
+- **Concentric Ring & Bar Visualization:**
+  - **Left Concentric Rings:**
+    - **Outer Ring:** Shows remaining quota percentage for **Gemini Flash**.
+    - **Inner Ring:** Shows remaining quota percentage for **Gemini Pro**.
+    - **Center Dot:** Shows remaining quota status for **Claude / GPT**.
+  - **Right Vertical Bar:** Shows remaining weekly **Prompt Credits** quota.
+- **Interactive Menu:** Click the icon to view detailed model breakdowns, weekly prompt/flow credits, and exact reset countdowns (e.g., "Resets in 3h 54m").
+- **Hover Tooltip:** Quick readout of percentages and weekly credits when hovering.
 - **Zero Config:** Automatically detects the running `language_server` process and queries it locally. No Google login credentials or API keys required.
 - **Auto-polling:** Automatically refreshes the data every 60 seconds (or manually via "Refresh Now" in the menu).
 

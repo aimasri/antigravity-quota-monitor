@@ -62,10 +62,13 @@ class AntigravityQuotaApp:
         self.timer = QTimer()
         self.timer.timeout.connect(self.poll_and_update)
         
+        # Start immediately
+        print("Initializing Antigravity Status Bar Monitor...")
         self.poll_and_update()
         self.timer.start(60000) # every 60 seconds
         
         self.tray.show()
+        print("Tray icon display initialized.")
 
     def get_pid_listening_ports(self, pid):
         inodes = set()
@@ -159,39 +162,66 @@ class AntigravityQuotaApp:
         except Exception:
             return None
 
-    def make_concentric_icon(self, fraction_flash, fraction_pro, fraction_claude):
+    def make_concentric_icon(self, fraction_flash, fraction_pro, fraction_claude, fraction_weekly):
         pixmap = QPixmap(22, 22)
         pixmap.fill(Qt.transparent)
         
         painter = QPainter(pixmap)
         painter.setRenderHint(QPainter.Antialiasing)
         
+        # Draw Concentric Rings (Shifted to Left: rect width=16, height=16, centered at y=3)
         bg_pen = QPen(QColor(80, 80, 80, 70), 2)
         painter.setPen(bg_pen)
-        painter.drawArc(QRectF(2, 2, 18, 18), 0, 360 * 16)
-        painter.drawArc(QRectF(5, 5, 12, 12), 0, 360 * 16)
+        painter.drawArc(QRectF(1, 3, 16, 16), 0, 360 * 16)
+        painter.drawArc(QRectF(4, 6, 10, 10), 0, 360 * 16)
         
         color_flash = get_qcolor(fraction_flash)
         pen_flash = QPen(color_flash, 2)
         painter.setPen(pen_flash)
-        painter.drawArc(QRectF(2, 2, 18, 18), 90 * 16, int(-fraction_flash * 360 * 16))
+        painter.drawArc(QRectF(1, 3, 16, 16), 90 * 16, int(-fraction_flash * 360 * 16))
         
         color_pro = get_qcolor(fraction_pro)
         pen_pro = QPen(color_pro, 2)
         painter.setPen(pen_pro)
-        painter.drawArc(QRectF(5, 5, 12, 12), 90 * 16, int(-fraction_pro * 360 * 16))
+        painter.drawArc(QRectF(4, 6, 10, 10), 90 * 16, int(-fraction_pro * 360 * 16))
         
         color_claude = get_qcolor(fraction_claude)
         painter.setBrush(QBrush(color_claude))
         painter.setPen(Qt.NoPen if PYQT_VERSION == 5 else Qt.PenStyle.NoPen)
-        painter.drawEllipse(QRectF(9, 9, 4, 4))
+        painter.drawEllipse(QRectF(7.5, 9.5, 3, 3))
         
+        # Draw Weekly Bar on Right (x=19, y=3 to y=19)
+        # Background bar track
+        bar_bg_pen = QPen(
+            QColor(80, 80, 80, 70),
+            2,
+            Qt.SolidLine if PYQT_VERSION == 5 else Qt.PenStyle.SolidLine,
+            Qt.RoundCap if PYQT_VERSION == 5 else Qt.PenCapStyle.RoundCap
+        )
+        painter.setPen(bar_bg_pen)
+        painter.drawLine(19, 3, 19, 19)
+        
+        # Foreground bar representing remaining weekly quota
+        color_weekly = get_qcolor(fraction_weekly)
+        bar_fg_pen = QPen(
+            color_weekly,
+            2,
+            Qt.SolidLine if PYQT_VERSION == 5 else Qt.PenStyle.SolidLine,
+            Qt.RoundCap if PYQT_VERSION == 5 else Qt.PenCapStyle.RoundCap
+        )
+        painter.setPen(bar_fg_pen)
+        bar_height = int(fraction_weekly * 16)
+        if bar_height > 0:
+            painter.drawLine(19, 19, 19, 19 - bar_height)
+            
         painter.end()
         return QIcon(pixmap)
 
     def poll_and_update(self):
+        print("Polling Antigravity quota status...")
         servers = self.find_language_servers()
         if not servers:
+            print("Error: No running language servers detected.")
             self.set_error_icon("No Server")
             return
 
@@ -205,18 +235,24 @@ class AntigravityQuotaApp:
 
         pid = standalone_server['pid']
         token = standalone_server['csrf_token']
+        print(f"Targeting server PID: {pid} (dir: {standalone_server['app_data_dir']})")
         
         ports = self.get_pid_listening_ports(pid)
+        print(f"Server ports: {ports}")
         status = None
         for port in ports:
+            print(f"Trying connection on port {port}...")
             status = self.query_user_status(port, token)
             if status:
+                print(f"Successfully connected to port {port}!")
                 break
 
         if not status:
+            print("Error: Failed to fetch status from any port.")
             self.set_error_icon("Offline")
             return
 
+        print("Parsing quota response...")
         user_status = status.get("userStatus", {})
         model_configs = user_status.get("cascadeModelConfigData", {}).get("clientModelConfigs", [])
         
@@ -248,16 +284,60 @@ class AntigravityQuotaApp:
         fraction_pro = min(pro_fracs) if pro_fracs else 1.0
         fraction_claude = min(claude_fracs) if claude_fracs else 1.0
 
-        icon = self.make_concentric_icon(fraction_flash, fraction_pro, fraction_claude)
-        self.tray.setIcon(icon)
-        self.tray.setToolTip(
-            f"Antigravity Quota\n"
-            f"Flash: {fraction_flash*100:.1f}%\n"
-            f"Pro: {fraction_pro*100:.1f}%\n"
-            f"Claude/GPT: {fraction_claude*100:.1f}%"
-        )
+        # Parse weekly quota (prompt & flow credits)
+        plan_status = user_status.get("planStatus", {})
+        plan_info = plan_status.get("planInfo", {})
+        
+        available_credits = plan_status.get("availablePromptCredits", 0)
+        total_credits = plan_info.get("monthlyPromptCredits", 0)
+        
+        available_flow = plan_status.get("availableFlowCredits", 0)
+        total_flow = plan_info.get("monthlyFlowCredits", 0)
 
-        self.rebuild_menu(flash_models, pro_models, claude_models)
+        try:
+            available_credits = int(available_credits) if available_credits is not None else 0
+            total_credits = int(total_credits) if total_credits is not None else 0
+            fraction_weekly = float(available_credits) / float(total_credits) if total_credits > 0 else 1.0
+        except (ValueError, TypeError, ZeroDivisionError):
+            fraction_weekly = 1.0
+            available_credits = 0
+            total_credits = 0
+
+        try:
+            available_flow = int(available_flow) if available_flow is not None else 0
+            total_flow = int(total_flow) if total_flow is not None else 0
+            fraction_flow = float(available_flow) / float(total_flow) if total_flow > 0 else 1.0
+        except (ValueError, TypeError, ZeroDivisionError):
+            fraction_flow = 1.0
+            available_flow = 0
+            total_flow = 0
+
+        print(f"Quota parsed: Flash={fraction_flash*100:.1f}%, Pro={fraction_pro*100:.1f}%, Claude/GPT={fraction_claude*100:.1f}%")
+        print(f"Weekly quota parsed: Prompt Credits={available_credits}/{total_credits} ({fraction_weekly*100:.1f}%), Flow={available_flow}/{total_flow} ({fraction_flow*100:.1f}%)")
+
+        icon = self.make_concentric_icon(fraction_flash, fraction_pro, fraction_claude, fraction_weekly)
+        self.tray.setIcon(icon)
+        
+        tooltip_lines = [
+            "Antigravity Quota",
+            f"Flash: {fraction_flash*100:.1f}%",
+            f"Pro: {fraction_pro*100:.1f}%",
+            f"Claude/GPT: {fraction_claude*100:.1f}%"
+        ]
+        if total_credits > 0:
+            tooltip_lines.append(f"Weekly Credits: {available_credits:,} / {total_credits:,} ({fraction_weekly*100:.1f}%)")
+        self.tray.setToolTip("\n".join(tooltip_lines))
+
+        weekly_info = {
+            "available_credits": available_credits,
+            "total_credits": total_credits,
+            "fraction_weekly": fraction_weekly,
+            "available_flow": available_flow,
+            "total_flow": total_flow,
+            "fraction_flow": fraction_flow
+        }
+        self.rebuild_menu(flash_models, pro_models, claude_models, weekly_info)
+        print("Tray icon and menu updated successfully.")
 
     def set_error_icon(self, msg):
         pixmap = QPixmap(22, 22)
@@ -286,7 +366,7 @@ class AntigravityQuotaApp:
         exit_action.triggered.connect(self.app.quit)
         self.menu.addAction(exit_action)
 
-    def rebuild_menu(self, flash, pro, claude):
+    def rebuild_menu(self, flash, pro, claude, weekly_info=None):
         self.menu.clear()
         
         def add_category_header(title):
@@ -296,6 +376,20 @@ class AntigravityQuotaApp:
             header.setFont(font)
             header.setEnabled(False)
             self.menu.addAction(header)
+
+        if weekly_info and weekly_info.get("total_credits", 0) > 0:
+            add_category_header("📅 Weekly Credits Quota")
+            avail_c = weekly_info["available_credits"]
+            total_c = weekly_info["total_credits"]
+            frac_c = weekly_info["fraction_weekly"]
+            self.menu.addAction(f"  Prompt Credits: {avail_c:,} / {total_c:,} ({frac_c*100:.1f}%)")
+            
+            if weekly_info.get("total_flow", 0) > 0:
+                avail_f = weekly_info["available_flow"]
+                total_f = weekly_info["total_flow"]
+                frac_f = weekly_info["fraction_flow"]
+                self.menu.addAction(f"  Flow Credits: {avail_f:,} / {total_f:,} ({frac_f*100:.1f}%)")
+            self.menu.addSeparator()
 
         add_category_header("⚡ Gemini Flash Bucket")
         for m in flash:
