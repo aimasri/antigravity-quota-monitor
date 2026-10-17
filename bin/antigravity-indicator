@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""
+Launcher script for Antigravity Quota Monitor.
+Supports both system-wide (/usr/local/) and user-local (~/.local/) deployments.
+"""
+
+import os
+import sys
+
+BIN_DIR = os.path.dirname(os.path.realpath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(BIN_DIR, ".."))
+USER_LIB_DIR = os.path.expanduser("~/.local/lib/antigravity-quota-monitor")
+SYSTEM_LIB_DIR = "/usr/local/lib/antigravity-quota-monitor"
+
+if os.path.isdir(os.path.join(PROJECT_ROOT, "antigravity_monitor")):
+    sys.path.insert(0, PROJECT_ROOT)
+elif os.path.isdir(USER_LIB_DIR):
+    sys.path.insert(0, USER_LIB_DIR)
+elif os.path.isdir(SYSTEM_LIB_DIR):
+    sys.path.insert(0, SYSTEM_LIB_DIR)
+
+from antigravity_monitor.main import main
+
+if __name__ == "__main__":
+    sys.exit(main())

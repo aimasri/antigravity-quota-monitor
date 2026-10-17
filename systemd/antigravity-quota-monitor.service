@@ -1,0 +1,17 @@
+[Unit]
+Description=Antigravity Quota Monitor System Tray Daemon
+Documentation=https://github.com/aimasri/antigravity-quota-monitor
+After=default.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/antigravity-indicator
+WorkingDirectory=%h
+Restart=on-failure
+RestartSec=3
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=%h/.Xauthority
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target
