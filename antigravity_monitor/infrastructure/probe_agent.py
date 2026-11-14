@@ -155,6 +155,45 @@ def _parse_fraction(qinfo: Optional[Dict[str, Any]]) -> float:
     return 1.0
 
 
+def _resolve_tier_name(
+    user_status: Optional[Dict[str, Any]],
+    models: Dict[str, Dict[str, Any]],
+    fallback: str = "Pro",
+) -> str:
+    """Resolves the Antigravity subscription tier from GetUserStatus.
+
+    Antigravity 2.0 populates the real Google One / Enterprise entitlement under
+    `userStatus.userTier` (e.g. `{"id": "g1-ultra-lite-tier", "name": "Google AI Ultra"}`),
+    while legacy Codeium `planStatus.planInfo.planName` remains hardcoded to `"Pro"`.
+    """
+    us = user_status or {}
+    user_tier = us.get("userTier") or {}
+    raw_user_tier = str(user_tier.get("name") or user_tier.get("id") or "").strip()
+    if raw_user_tier:
+        lower_ut = raw_user_tier.lower()
+        if "ultra" in lower_ut:
+            return "Ultra"
+        if "enterprise" in lower_ut:
+            return "Enterprise"
+        if "plus" in lower_ut:
+            return "Plus"
+        if "pro" in lower_ut:
+            return "Pro"
+        if "free" in lower_ut:
+            return "Free"
+        return raw_user_tier
+
+    plan_info = (us.get("planStatus") or {}).get("planInfo") or {}
+    plan_name = str(plan_info.get("planName") or "").strip()
+
+    # Gemini 4 Carbon is strictly gated to Google AI Ultra and Enterprise.
+    has_carbon = any("carbon" in lbl.lower() for lbl in models)
+    if has_carbon and plan_name.lower() in ("", "pro"):
+        return "Ultra"
+
+    return plan_name or fallback
+
+
 def run_probe(force_refresh: bool = True) -> Dict[str, Any]:
     """Executes the probe against the active Antigravity language_server."""
     hostname = socket.gethostname()
@@ -172,6 +211,7 @@ def run_probe(force_refresh: bool = True) -> Dict[str, Any]:
     merged_models: Dict[str, Dict[str, Any]] = {}
     quota_groups: Dict[str, Dict[str, Any]] = {}
     surfaces_connected: List[str] = []
+    latest_user_status: Optional[Dict[str, Any]] = None
     tier_name = "Pro"
     user_email = ""
 
@@ -249,9 +289,8 @@ def run_probe(force_refresh: bool = True) -> Dict[str, Any]:
             surfaces_connected.append(f"{srv['surface']} (PID {srv['pid']})")
             if status:
                 us = status.get("userStatus", {})
+                latest_user_status = us
                 user_email = us.get("email") or user_email
-                plan_info = us.get("planStatus", {}).get("planInfo", {})
-                tier_name = plan_info.get("planName") or tier_name
 
                 cmcd = us.get("cascadeModelConfigData", {})
                 if not default_override_id:
@@ -287,6 +326,7 @@ def run_probe(force_refresh: bool = True) -> Dict[str, Any]:
             "detail": f"Could not query LanguageServerService on {hostname}",
         }
 
+    tier_name = _resolve_tier_name(latest_user_status, merged_models, fallback=tier_name)
     active_id = selected_model_id or default_override_id
     return {
         "ok": True,

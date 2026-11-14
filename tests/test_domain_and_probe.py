@@ -16,6 +16,7 @@ from antigravity_monitor.domain.policy import (
     format_reset_time,
     build_host_snapshot,
 )
+from antigravity_monitor.infrastructure.probe_agent import _resolve_tier_name
 from antigravity_monitor.infrastructure.ssh_discovery import is_local_target
 
 
@@ -55,11 +56,36 @@ class TestDomainPolicies(unittest.TestCase):
 
     def test_model_classification(self):
         """Verifies classification of model names into 'gemini' or 'claude_gpt'."""
+        self.assertEqual(classify_model_group("Gemini 4 Carbon (High)"), "gemini")
+        self.assertEqual(classify_model_group("Carbon (Low)"), "gemini")
         self.assertEqual(classify_model_group("Gemini 4 Argon (Low)"), "gemini")
         self.assertEqual(classify_model_group("Gemini 3.8 Flash (High)"), "gemini")
+        self.assertEqual(classify_model_group("Gemini 4 Hydrogen (High)"), "gemini")
+        self.assertEqual(classify_model_group("Gemini 4 Hydrogen (XHigh)"), "gemini")
+        self.assertEqual(classify_model_group("Orchestrator (Carbon)"), "gemini")
+        self.assertEqual(classify_model_group("Orchestrator (Argon)"), "gemini")
+        self.assertEqual(classify_model_group("Orchestrator"), "gemini")
         self.assertEqual(classify_model_group("Claude Opus 5.5"), "claude_gpt")
         self.assertEqual(classify_model_group("Claude Sonnet 5.5"), "claude_gpt")
         self.assertEqual(classify_model_group("GPT-OSS 120B"), "claude_gpt")
+
+    def test_tier_resolution_ultra_and_carbon_fallback(self):
+        """Verifies AGY 2.0 userTier resolution overrides legacy Codeium 'Pro' planName."""
+        # 1. Live AGY 2.0 Ultra payload (planInfo.planName='Pro', userTier.name='Google AI Ultra')
+        agy2_ultra_status = {
+            "planStatus": {"planInfo": {"teamsTier": "TEAMS_TIER_PRO", "planName": "Pro"}},
+            "userTier": {"id": "g1-ultra-lite-tier", "name": "Google AI Ultra"},
+        }
+        models_with_carbon = {"Gemini 4 Carbon (High)": {"label": "Gemini 4 Carbon (High)"}}
+        self.assertEqual(_resolve_tier_name(agy2_ultra_status, models_with_carbon), "Ultra")
+
+        # 2. Fallback when userTier is omitted on an older surface but Carbon is entitled
+        legacy_surface_status = {"planStatus": {"planInfo": {"planName": "Pro"}}}
+        self.assertEqual(_resolve_tier_name(legacy_surface_status, models_with_carbon), "Ultra")
+
+        # 3. Genuine Pro tier without Carbon entitlement
+        models_pro_only = {"Gemini 4 Argon (Medium)": {"label": "Gemini 4 Argon (Medium)"}}
+        self.assertEqual(_resolve_tier_name(legacy_surface_status, models_pro_only), "Pro")
 
     def test_snapshot_and_two_ring_builder(self):
         """Verifies that HostQuotaSnapshot creates exactly 2 rings (Outer=5h, Inner=Weekly)."""
@@ -67,9 +93,9 @@ class TestDomainPolicies(unittest.TestCase):
             "ok": True,
             "hostname": "test-host",
             "surfaces": ["AGY 2.0 (PID 1234)"],
-            "tier": "Pro",
+            "tier": "Ultra",
             "email": "dev@test.org",
-            "active_model_id": "MODEL_ARGON",
+            "active_model_id": "MODEL_CARBON",
             "groups": {
                 "gemini": {
                     "display_name": "Gemini Models",
@@ -83,14 +109,16 @@ class TestDomainPolicies(unittest.TestCase):
                 }
             },
             "models": [
-                {"label": "Gemini 4 Argon (Low)", "model_id": "MODEL_ARGON", "fraction": 0.58, "reset": ""}
+                {"label": "Gemini 4 Carbon (Low)", "model_id": "MODEL_CARBON", "fraction": 0.58, "reset": ""}
             ]
         }
 
         snapshot = build_host_snapshot(raw_probe)
         self.assertIsNotNone(snapshot)
         self.assertEqual(snapshot.hostname, "test-host")
-        self.assertEqual(snapshot.active_model.label, "Gemini 4 Argon (Low)")
+        self.assertEqual(snapshot.tier, "Ultra")
+        self.assertEqual(snapshot.active_model.label, "Gemini 4 Carbon (Low)")
+        self.assertEqual(snapshot.gemini_pool.subtitle, "Carbon • Argon • Hydrogen • Flash")
 
         # Verify exactly 2 rings
         self.assertEqual(len(snapshot.rings), 2)

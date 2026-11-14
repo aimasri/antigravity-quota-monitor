@@ -1,18 +1,21 @@
 # AI Agent Guidelines & Engineering Protocol: Antigravity Quota Monitor
 
-This document synthesizes the mandatory systems engineering, architectural, and cluster-operational standards from **gutterDesk** (`/home/ahmed/gutterDesk/docs/AGENTS.md`) and **Banyan** (`/home/ahmed/projects/Banyan/AGENT.md`), tailored specifically for the **Antigravity Quota Monitor** (`antigravity-quota-monitor`) daemon.
+This document synthesizes the mandatory systems engineering, architectural, and cluster-operational standards from **gutterDesk** (`/home/ahmed/gutterDesk/AGENTS.md`) and **Banyan** (`/home/ahmed/projects/Banyan/AGENTS.md`), tailored specifically for the **Antigravity Quota Monitor** (`antigravity-quota-monitor`) daemon.
 
 ---
 
-## 1. MANDATORY COMPLIANCE GATE
-> **Before executing any tool to write or modify code or system configurations, you MUST output a `<COMPLIANCE_CHECK>` text block in your response.**
-> In this block, you must explicitly state how the exact changes you are about to make comply with:
+## 1. MANDATORY TURN-LEVEL COMPLIANCE & DETERMINISTIC VERIFICATION GATE
+> **Turn-Level (Batch) Compliance Gate:**
+> Before executing any tool to write or modify code or system configurations in a turn, you MUST output a single `<COMPLIANCE_CHECK>` text block covering all planned modifications for that turn.
+> In this block, you must explicitly state how the batch of changes complies with:
 > 1. **Multi-node cluster topology & sync safety** (`aim-stream`, `aim-home`, `aim-book` — canonical source on development host, clean deployment to `/usr/local/bin/` and `~/.config/systemd/user/`, zero duplicate binary drift in `~/.local/bin/`).
 > 2. **SOLID Architecture & Resource Safety** (Single Responsibility across Domain, Infrastructure, and Presentation tiers; strict timeout/handle cleanup; non-blocking GUI event loop).
 > 3. **Script Idempotency & Privilege Separation** (`$TARGET_USER` vs. `root`, `set -euo pipefail`, mandatory script header docblocks).
 > 4. **Blast Radius & Tool Constraints** (evaluating impact on X11 session, `tint2` system tray, `systemd --user` units, SSH ControlMaster sockets; native file/URL tools only, no terminal `curl`/`wget`, no arbitrary shortcut test configs).
+> You may then execute all related write/edit tools in that turn under that single check without repeating compliance blocks per tool call.
 >
-> Any code generation or system modification without this preceding `<COMPLIANCE_CHECK>` block is strictly forbidden.
+> **Deterministic Tooling over LLM Self-Scrutiny:**
+> Prioritize deterministic verification (automated static linters, shell linter `shellcheck`, syntax checks, and systemd unit verification) over repetitive text rationalization. When available, run deterministic checks to confirm compliance rather than asserting compliance subjectively.
 
 ---
 
@@ -82,3 +85,6 @@ Following the **Banyan Desktop (`desktop/src/`)** three-tier architecture (`doma
    - Quartile color band calculation (`> 0.75`, `0.50 - 0.75`, `0.25 - 0.50`, `<= 0.25`).
    - Active model resolution (`Gemini 4 Argon`, `Claude Sonnet`, fallback ordering) and 2-ring mapping (`Outer = 5h`, `Inner = Weekly`).
    - SSH host discovery and local-target loop prevention.
+4. **Tool-First Grounding**: Never rely on parametric memory for library APIs, CLI flags, schemas, or codebase structure. Before proposing code changes, answering technical questions, or calling unfamiliar APIs, you MUST inspect the target files, local schemas, or official documentation using read/search tools first. If a detail cannot be verified via tools, state explicitly that it is unverified rather than guessing.
+5. **Short-Horizon Verification Gates**: Do not chain multiple unverified assumptions across long multi-step turns. Break complex debugging and refactoring into atomic steps—verify the state (via file view, test execution, or typecheck) after each logical change before proceeding to the next step, or delegate isolated research tasks to subagents to keep the main context window clean.
+6. **Mandatory Evidence Links**: Every claim about codebase behavior, bug root causes, or external facts must be backed by an exact file-and-line link (e.g., [file.py](file:///abs/path/file.py#L10-L20)) or a verified source URL. Never cite a symbol, method signature, or line range without having viewed it in the current session.

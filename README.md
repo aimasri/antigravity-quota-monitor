@@ -107,7 +107,7 @@ python3 -m unittest discover -s tests -v
 Verifies:
 1. Go Proto3 zero-omission fraction parsing (`remainingFraction` omitted when `0.0`).
 2. Quartile color band thresholds (`#62c98b`, `#facc15`, `#fb923c`, `#f87171`).
-3. Model-to-pool classification (`Gemini 4 Argon`, `Gemini 3.8 Flash`, `Claude Opus/Sonnet 5.5`).
+3. Model-to-pool classification (`Gemini 4 Carbon/Argon/Hydrogen`, `Gemini 3.8 Flash`, `Claude Opus/Sonnet 5.5`).
 4. Two-ring concentric gauge generation (`Outer = 5h`, `Inner = Weekly`).
 5. Local vs. remote SSH target resolution.
 
