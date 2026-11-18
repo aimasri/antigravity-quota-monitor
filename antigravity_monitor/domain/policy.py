@@ -18,7 +18,7 @@ from .models import QuotaBucket, PoolQuota, ActiveModelInfo, RingSpec, HostQuota
 POOL_METADATA = {
     "gemini": {
         "title": "Gemini Models",
-        "subtitle": "Carbon • Argon • Hydrogen • Flash",
+        "subtitle": "Carbon • Neon • Argon • Hydrogen • Flash",
         "short": "Gemini",
         "icon": "💎",
     },
@@ -121,7 +121,7 @@ def format_reset_time(reset_str: Optional[str], include_clock: bool = False) -> 
 
 def classify_model_group(label: str) -> str:
     lower = label.lower()
-    if re.search(r"carbon|argon|hydrogen|orchestrator|pro|flash|lite|gemini", lower):
+    if re.search(r"carbon|neon|argon|hydrogen|orchestrator|pro|flash|lite|gemini", lower):
         return "gemini"
     return "claude_gpt"
 

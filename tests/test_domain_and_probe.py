@@ -58,11 +58,15 @@ class TestDomainPolicies(unittest.TestCase):
         """Verifies classification of model names into 'gemini' or 'claude_gpt'."""
         self.assertEqual(classify_model_group("Gemini 4 Carbon (High)"), "gemini")
         self.assertEqual(classify_model_group("Carbon (Low)"), "gemini")
+        self.assertEqual(classify_model_group("Gemini 4 Neon (Low)"), "gemini")
+        self.assertEqual(classify_model_group("Gemini 4 Neon (XHigh)"), "gemini")
+        self.assertEqual(classify_model_group("Neon (Medium)"), "gemini")
         self.assertEqual(classify_model_group("Gemini 4 Argon (Low)"), "gemini")
         self.assertEqual(classify_model_group("Gemini 3.8 Flash (High)"), "gemini")
         self.assertEqual(classify_model_group("Gemini 4 Hydrogen (High)"), "gemini")
         self.assertEqual(classify_model_group("Gemini 4 Hydrogen (XHigh)"), "gemini")
         self.assertEqual(classify_model_group("Orchestrator (Carbon)"), "gemini")
+        self.assertEqual(classify_model_group("Orchestrator (Neon)"), "gemini")
         self.assertEqual(classify_model_group("Orchestrator (Argon)"), "gemini")
         self.assertEqual(classify_model_group("Orchestrator"), "gemini")
         self.assertEqual(classify_model_group("Claude Opus 5.5"), "claude_gpt")
@@ -118,7 +122,7 @@ class TestDomainPolicies(unittest.TestCase):
         self.assertEqual(snapshot.hostname, "test-host")
         self.assertEqual(snapshot.tier, "Ultra")
         self.assertEqual(snapshot.active_model.label, "Gemini 4 Carbon (Low)")
-        self.assertEqual(snapshot.gemini_pool.subtitle, "Carbon • Argon • Hydrogen • Flash")
+        self.assertEqual(snapshot.gemini_pool.subtitle, "Carbon • Neon • Argon • Hydrogen • Flash")
 
         # Verify exactly 2 rings
         self.assertEqual(len(snapshot.rings), 2)
